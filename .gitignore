@@ -1,6 +1,11 @@
-/data/STORE2
-/data/STORE3
-/data/STORE4
-/data/STORE5
 
 task4
+/src/aefaef.py
+/src/prof.out
+/src/testclean.py
+/src/testclean2.py
+/src/data_loader12.py
+/src/.claude
+__pycache__/
+/claude2.py.lprof
+/data/*/clean/*.html
