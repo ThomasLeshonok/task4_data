@@ -60,7 +60,8 @@ How questions are answered: the model never sees the raw data. It chooses tools 
 "How I got this" shows every tool call and its raw result.
 
 Part 3 hook: dashboard filters are a `FilterSpec` kept in `st.session_state` (`extra_conditions` and the `f_*` keys).
-An AI command only has to produce the same `FilterSpec`.
+An AI command only has to produce the same `FilterSpec`: an answer whose tool calls used filters gets a
+"Show on dashboard" button that puts them in the sidebar (`as_sales_filter` maps users/books columns to sales).
 
 ## Deploy to Streamlit Community Cloud (free)
 

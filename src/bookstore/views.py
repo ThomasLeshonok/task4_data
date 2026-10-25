@@ -5,6 +5,12 @@ from .query import FilterSpec, apply_filters
 from .repository import Store
 
 VIEWS = ("books", "users", "sales")
+# books and users columns that the sales view also has, under their sales name
+SALES_COLUMNS = {
+    "books": {"id": "book_id", "title": "title", "authors": "authors", "genre": "genre",
+              "publisher": "publisher", "year": "book_year"},
+    "users": {"id": "user_id", "person": "person", "name": "customer_name", "email": "customer_email"},
+}
 
 @lru_cache(maxsize=64)
 def build_view(store: Store, name: str) -> pd.DataFrame:
@@ -54,6 +60,21 @@ def filter_store(store: Store, spec: FilterSpec) -> Store:
     if spec.is_empty():
         return store
     return store.subset(apply_filters(build_view(store, "sales"), spec)["order_id"])
+
+def as_sales_filter(table: str, spec: FilterSpec) -> FilterSpec:
+    """The same filter on the sales view: orders of the matching books or customers."""
+    if table == "sales":
+        return spec
+    names = SALES_COLUMNS[table]
+    def rename(column: str) -> str:
+        if column not in names:
+            raise ValueError(f"{table}.{column} is not in the sales view")
+        return names[column]
+    conditions = [
+        c.model_copy(update={"column": [rename(x) for x in c.column] if isinstance(c.column, list) else rename(c.column)})
+        for c in spec.conditions
+    ]
+    return spec.model_copy(update={"conditions": conditions})
 
 def combined_view(stores: list[Store], name: str) -> pd.DataFrame:
     frames = [build_view(s, name) for s in stores]

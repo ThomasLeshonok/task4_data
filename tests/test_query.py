@@ -3,7 +3,7 @@ import pytest
 
 from bookstore.analytics import summarize
 from bookstore.query import Condition, FilterSpec, aggregate, apply_filters, list_rows
-from bookstore.views import build_view
+from bookstore.views import as_sales_filter, build_view
 
 def spec(*conditions, match="all"):
     return FilterSpec(conditions=[Condition(**c) for c in conditions], match=match)
@@ -72,3 +72,14 @@ def test_subset_keeps_full_store_aliases(store1):
     sub = store1.subset(sales.loc[sales["month"] == "2025-08", "order_id"])
     assert set(sub.people.unique()) <= set(store1.people.unique())
     assert sub.orders["paid_price"].sum() == pytest.approx(sales.loc[sales["month"] == "2025-08", "paid_price"].sum())
+
+def test_users_filter_becomes_orders_of_those_users(store1):
+    users = build_view(store1, "users")
+    sales = build_view(store1, "sales")
+    users_spec = spec({"column": "email", "op": "startswith", "value": ["s", "p"]})
+    got = apply_filters(sales, as_sales_filter("users", users_spec))
+    assert set(got["user_id"]) == set(apply_filters(users, users_spec)["id"]) & set(sales["user_id"])
+
+def test_users_filter_on_column_missing_from_sales_fails():
+    with pytest.raises(ValueError):
+        as_sales_filter("users", spec({"column": "phone", "op": "contains", "value": "555"}))

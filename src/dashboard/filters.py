@@ -41,6 +41,11 @@ def _clear() -> None:
         st.session_state.pop(key, None)
     st.session_state[CONDITIONS_KEY] = []
 
+def set_filters(spec: FilterSpec) -> None:
+    """Replace every sidebar filter with the conditions of spec (all must match)."""
+    _clear()
+    st.session_state[CONDITIONS_KEY] = [c.model_dump() for c in spec.conditions]
+
 def _remove(index: int) -> None:
     st.session_state[CONDITIONS_KEY].pop(index)
 

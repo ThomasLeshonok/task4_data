@@ -3,12 +3,17 @@ from typing import Callable
 import streamlit as st
 
 from assistant.agent import Assistant, llm_configured
+from assistant.tools import ALL
+from bookstore.query import FilterSpec
+from bookstore.views import as_sales_filter
 from security.limits import Limits
 
 from .access import minutes
 
 HISTORY_KEY = "chat"
 CONTEXT_MESSAGES = 6
+MAX_DASHBOARD_BUTTONS = 3
+ShowOnDashboard = Callable[[FilterSpec, str | None], None]
 EXAMPLES = [
     "How many unique users are in STORE1?",
     "Top 3 genres by revenue in STORE2",
@@ -25,6 +30,30 @@ def _show_steps(steps: list[dict]) -> None:
             st.code(json.dumps(step["arguments"], indent=2, ensure_ascii=False), language="json")
             st.code(json.dumps(step["result"], indent=2, ensure_ascii=False, default=str)[:4000], language="json")
 
+def dashboard_filters(steps: list[dict]) -> list[tuple[FilterSpec, str | None]]:
+    """Each distinct filter the tool calls used, as an orders filter, with its store (None when several or ALL)."""
+    found: dict[str, tuple[FilterSpec, set[str]]] = {}
+    for step in steps:
+        args = step["arguments"]
+        if "error" in step["result"] or not args.get("filters", {}).get("conditions"):
+            continue
+        try:
+            spec = as_sales_filter(args.get("table", "sales"), FilterSpec.model_validate(args["filters"]))
+        except ValueError:  # column the sales view lacks, e.g. users.phone
+            continue
+        if spec.match == "any" and len(spec.conditions) > 1:
+            continue  # the sidebar only ANDs conditions
+        _, stores = found.setdefault(spec.model_dump_json(), (spec, set()))
+        stores.add(str(args.get("store", "")).upper())
+    return [(spec, next(iter(stores)) if len(stores) == 1 and ALL not in stores else None)
+            for spec, stores in found.values()]
+
+def _dashboard_buttons(steps: list[dict], key: str, show_on_dashboard: ShowOnDashboard) -> None:
+    for i, (spec, store) in enumerate(dashboard_filters(steps)[:MAX_DASHBOARD_BUTTONS]):
+        label = " and ".join(c.label() for c in spec.conditions)
+        if st.button(f"Show on dashboard: {label}", key=f"{key}_{i}", icon=":material/dashboard:"):
+            show_on_dashboard(spec, store)
+
 def _allowed(limits: Limits, ip: str, question: str) -> str | None:
     if len(question) > limits.question_max_chars:
         return f"Please keep questions under {limits.question_max_chars} characters."
@@ -36,7 +65,8 @@ def _allowed(limits: Limits, ip: str, question: str) -> str | None:
         return "The daily question limit for this app is reached. Try again tomorrow."
     return None
 
-def render_chat(get_assistant: Callable[[], Assistant], limits: Limits, ip: str) -> None:
+def render_chat(get_assistant: Callable[[], Assistant], limits: Limits, ip: str,
+                show_on_dashboard: ShowOnDashboard) -> None:
     st.title("Ask the data")
     st.caption("Answers come from computed queries over the cleaned data, never from the model's memory. "
                "Open “How I got this” under an answer to see every query and its raw result.")
@@ -47,10 +77,11 @@ def render_chat(get_assistant: Callable[[], Assistant], limits: Limits, ip: str)
     history = st.session_state.setdefault(HISTORY_KEY, [])
     if not history:
         st.markdown("Try: " + " · ".join(f"*{q}*" for q in EXAMPLES))
-    for message in history:
+    for i, message in enumerate(history):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             _show_steps(message.get("steps", []))
+            _dashboard_buttons(message.get("steps", []), f"dash_{i}", show_on_dashboard)
 
     question = st.chat_input("Ask about sales, books or customers")
     if not question:
@@ -72,6 +103,7 @@ def render_chat(get_assistant: Callable[[], Assistant], limits: Limits, ip: str)
         st.markdown(answer.text)
         steps = [vars(s) for s in answer.steps]
         _show_steps(steps)
+        _dashboard_buttons(steps, f"dash_{len(history) + 1}", show_on_dashboard)
     history.append({"role": "user", "content": question})
     history.append({"role": "assistant", "content": answer.text, "steps": steps})
 
