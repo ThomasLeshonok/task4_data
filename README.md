@@ -88,6 +88,14 @@ You need an Azure subscription and the Azure CLI (`winget install Microsoft.Azur
 4. Portal: App Service > Deployment Center > GitHub, pick this repository and branch. Every push redeploys.
 5. Open `https://<app>.azurewebsites.net` and log in as `Customer`.
 
+### Azure Deployment Environments (optional)
+
+`environments/webapp/` is an environment definition (`environment.yaml` + `main.bicep`) that creates the same
+plan and web app. Dev center > Catalogs > Add: this repository, branch `main`, folder path `environments`.
+Then devportal.microsoft.com > New environment > `Task4WebApp` (needs a Microsoft Entra work account with the
+Deployment Environments User role on the project). `repoUrl` works for public repositories only; for a private
+one leave it empty and connect Deployment Center afterwards. Parameter values are visible to project members.
+
 ### Abuse protection
 
 - Network floods: Azure DDoS infrastructure protection covers every App Service at no cost (network and
