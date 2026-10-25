@@ -1,0 +1,52 @@
+name: Task4WebApp
+version: 1.0.0
+summary: Streamlit sales dashboard on Azure App Service (Linux)
+description: Creates an App Service plan and a Python web app that runs streamlit_app.py, optionally pulling the code from a public GitHub repository.
+runner: Bicep
+templatePath: main.bicep
+
+parameters:
+  - id: appName
+    name: App name
+    description: Globally unique web app name (<app>.azurewebsites.net). Leave empty for a generated name.
+    type: string
+    default: ""
+  - id: sku
+    name: Plan SKU
+    type: string
+    default: B1
+    allowed: [B1, B2, S1, P0v3]
+  - id: pythonVersion
+    name: Python version
+    type: string
+    default: "3.13"
+  - id: repoUrl
+    name: GitHub repository URL
+    description: Public repository to deploy from. Leave empty and use Deployment Center for a private one.
+    type: string
+    default: ""
+  - id: branch
+    name: Branch
+    type: string
+    default: main
+  - id: appUsername
+    name: Login username
+    type: string
+    default: Customer
+  - id: appPasswordHash
+    name: Password hash
+    description: Output of python src/security/auth.py (the part after APP_PASSWORD_HASH=).
+    type: string
+    required: true
+  - id: openAiEndpoint
+    name: Azure OpenAI endpoint
+    type: string
+    default: ""
+  - id: openAiDeployment
+    name: Azure OpenAI deployment
+    type: string
+    default: ""
+  - id: openAiApiKey
+    name: Azure OpenAI API key
+    type: string
+    default: ""
