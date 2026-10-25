@@ -7,6 +7,8 @@ from .tools import Toolbox
 
 MAX_ROUNDS = 8
 MAX_TOOL_RESULT_CHARS = 12_000
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
+GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
 
 SYSTEM_PROMPT = """You answer questions about bookstore data. Stores: {stores}.
 
@@ -52,8 +54,35 @@ class AzureChatClient:
         )
         return response.choices[0].message
 
+class GroqChatClient:
+    """Groq's OpenAI-compatible API (free tier at console.groq.com)."""
+
+    def __init__(self):
+        from openai import OpenAI
+
+        self.client = OpenAI(api_key=os.environ["GROQ_API_KEY"], base_url=GROQ_BASE_URL)
+        self.model = os.environ.get("GROQ_MODEL") or GROQ_DEFAULT_MODEL
+        temperature = os.environ.get("GROQ_TEMPERATURE", "0")
+        self.extra = {"temperature": float(temperature)} if temperature else {}
+
+    def complete(self, messages: list[dict], tools: list[dict]):
+        response = self.client.chat.completions.create(
+            model=self.model, messages=messages, tools=tools, **self.extra
+        )
+        return response.choices[0].message
+
 def azure_configured() -> bool:
     return all(os.environ.get(k) for k in ("AZURE_OPENAI_API_KEY", "AZURE_OPENAI_ENDPOINT", "AZURE_OPENAI_DEPLOYMENT"))
+
+def groq_configured() -> bool:
+    return bool(os.environ.get("GROQ_API_KEY"))
+
+def llm_configured() -> bool:
+    return groq_configured() or azure_configured()
+
+def make_chat_client() -> ChatClient:
+    """Groq when GROQ_API_KEY is set, otherwise Azure OpenAI."""
+    return GroqChatClient() if groq_configured() else AzureChatClient()
 
 @dataclass
 class Step:

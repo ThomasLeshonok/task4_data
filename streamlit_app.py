@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 load_dotenv(ROOT / ".env")
+st.secrets.load_if_toml_exists()  # Streamlit Community Cloud: top-level secrets become environment variables
 
-from assistant.agent import Assistant, AzureChatClient
+from assistant.agent import Assistant, make_chat_client
 from assistant.tools import Toolbox
 from bookstore.analytics import StoreSummary, summarize
 from bookstore.query import FilterSpec
@@ -19,7 +20,7 @@ from dashboard import views
 from dashboard.access import login_gate, logout_button, session_allowed
 from dashboard.chat import clear_chat_button, render_chat
 from dashboard.components import apply_styles
-from dashboard.filters import FilterOptions, filter_sidebar, keep_filter_state
+from dashboard.filters import FilterOptions, filter_sidebar, keep_filter_state, set_filters
 from security.limits import Limits, client_ip
 
 STORE_KEY = "store"
@@ -52,7 +53,7 @@ def get_filter_options() -> FilterOptions:
 
 @st.cache_resource
 def get_assistant() -> Assistant:
-    return Assistant(AzureChatClient(), Toolbox(get_store, list_stores()))
+    return Assistant(make_chat_client(), Toolbox(get_store, list_stores()))
 
 def dashboard_page() -> None:
     st.title("Bookstore Sales Dashboard")
@@ -70,9 +71,18 @@ def dashboard_page() -> None:
                 store = get_store(name)
                 views.render_store(store, filter_store(store, spec), get_summary(name, spec.model_dump_json()))
 
+def show_on_dashboard(spec: FilterSpec, store: str | None) -> None:
+    set_filters(spec)
+    match = next((s for s in list_stores() if store and s.casefold() == store.casefold()), None)
+    if match:
+        st.session_state[STORE_KEY] = match
+    st.switch_page(DASHBOARD)
+
 def chat_page() -> None:
     clear_chat_button()
-    render_chat(get_assistant, get_limits(), client_ip(st.context.headers, st.context.ip_address))
+    render_chat(get_assistant, get_limits(), client_ip(st.context.headers, st.context.ip_address), show_on_dashboard)
+
+DASHBOARD = st.Page(dashboard_page, title="Dashboard", icon=":material/dashboard:", default=True)
 
 def main() -> None:
     apply_styles()
@@ -83,7 +93,7 @@ def main() -> None:
     logout_button()
     keep_filter_state()
     st.navigation([
-        st.Page(dashboard_page, title="Dashboard", icon=":material/dashboard:", default=True),
+        DASHBOARD,
         st.Page(chat_page, title="Ask the data", icon=":material/chat:", url_path="ask"),
     ]).run()
 
