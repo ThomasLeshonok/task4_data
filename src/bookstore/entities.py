@@ -21,7 +21,7 @@ def reconcile_users(users: pd.DataFrame) -> pd.Series:
             for other in group.iloc[1:]:
                 parent[_find(parent, int(other))] = root
     roots = pd.Series([_find(parent, i) for i in ids], index=ids)
-    return roots.groupby(roots).transform("min").rename("person")
+    return roots.index.to_series().groupby(roots.values).transform("min").rename("person")
 
 def author_sets(books: pd.DataFrame) -> pd.Series:
     names = strip_titles(books["author"].str.split(",").explode()).dropna()
