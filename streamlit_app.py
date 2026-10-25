@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 load_dotenv(ROOT / ".env")
+st.secrets.load_if_toml_exists()  # Streamlit Community Cloud: top-level secrets become environment variables
 
-from assistant.agent import Assistant, AzureChatClient
+from assistant.agent import Assistant, make_chat_client
 from assistant.tools import Toolbox
 from bookstore.analytics import StoreSummary, summarize
 from bookstore.query import FilterSpec
@@ -52,7 +53,7 @@ def get_filter_options() -> FilterOptions:
 
 @st.cache_resource
 def get_assistant() -> Assistant:
-    return Assistant(AzureChatClient(), Toolbox(get_store, list_stores()))
+    return Assistant(make_chat_client(), Toolbox(get_store, list_stores()))
 
 def dashboard_page() -> None:
     st.title("Bookstore Sales Dashboard")

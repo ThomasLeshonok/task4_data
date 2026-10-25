@@ -16,7 +16,8 @@ streamlit run streamlit_app.py
 ```
 
 `python src/security/auth.py` asks for a password and prints `APP_PASSWORD_HASH=...`; put that line in `.env`.
-Log in as `Customer` with that password. Add the `AZURE_OPENAI_*` values to `.env` to turn on "Ask the data".
+Log in as `Customer` with that password. Set `GROQ_API_KEY` (free key from console.groq.com) or the
+`AZURE_OPENAI_*` values in `.env` to turn on "Ask the data". Groq is used when both are set.
 
 The dashboard reads `data/<STORE>/clean/*_clean.parquet` and shows one tab per store that has them.
 To rebuild clean data for a store:
@@ -33,8 +34,8 @@ Print the dashboard metrics in the terminal: `python src/queries.py STORE1`.
 python -m pytest tests
 ```
 
-`tests/test_eval_questions.py` asks the real Azure OpenAI deployment grader-style questions and compares the
-answers with values computed by pandas. It is skipped until `AZURE_OPENAI_*` is set.
+`tests/test_eval_questions.py` asks the real model (Groq or Azure OpenAI) grader-style questions and compares the
+answers with values computed by pandas. It is skipped until `GROQ_API_KEY` or `AZURE_OPENAI_*` is set.
 
 ## Layout
 
@@ -49,7 +50,7 @@ answers with values computed by pandas. It is skipped until `AZURE_OPENAI_*` is 
 | `src/bookstore/views.py` | Flat `books`, `users`, `sales` tables for filtering and questions |
 | `src/bookstore/query.py` | `FilterSpec` / `Condition` and safe filter, aggregate, list operations |
 | `src/assistant/tools.py` | Tools the model may call; each wraps `bookstore.query` |
-| `src/assistant/agent.py` | Azure OpenAI tool-calling loop and system prompt |
+| `src/assistant/agent.py` | Tool-calling loop, system prompt, Groq and Azure OpenAI clients |
 | `src/security/` | Password hashing, per-IP rate limits, client IP detection |
 | `src/dashboard/` | Streamlit pages: login, filters, store view, chat |
 | `streamlit_app.py` | Entry point: caching, login gate, pages |
@@ -61,48 +62,21 @@ How questions are answered: the model never sees the raw data. It chooses tools 
 Part 3 hook: dashboard filters are a `FilterSpec` kept in `st.session_state` (`extra_conditions` and the `f_*` keys).
 An AI command only has to produce the same `FilterSpec`.
 
-## Deploy to Azure App Service
+## Deploy to Streamlit Community Cloud (free)
 
-You need an Azure subscription and the Azure CLI (`winget install Microsoft.AzureCLI`).
+1. Get a free API key at console.groq.com > API Keys.
+2. Push this repository to GitHub (`.env` stays out: it is in `.gitignore`).
+3. share.streamlit.io > Create app > pick the repository, branch, main file `streamlit_app.py`.
+   Advanced settings: Python 3.13, and paste the secrets (the hash comes from `python src/security/auth.py`):
 
-1. In Azure AI Foundry create an Azure OpenAI resource and deploy a chat model that supports tool calling
-   (for example `gpt-4.1` or `gpt-4o`). Note the endpoint, key and deployment name.
-2. Create the web app (pick a unique `<app>` name; use the newest `PYTHON:3.x` from `az webapp list-runtimes --os linux`):
-
-   ```powershell
-   az login
-   az group create -n task4-rg -l westeurope
-   az appservice plan create -g task4-rg -n task4-plan --sku B1 --is-linux
-   az webapp create -g task4-rg -p task4-plan -n <app> --runtime "PYTHON:3.13"
-   az webapp config set -g task4-rg -n <app> --web-sockets-enabled true --always-on true --startup-file "python -m streamlit run streamlit_app.py --server.port 8000 --server.address 0.0.0.0"
-   az webapp update -g task4-rg -n <app> --https-only true
+   ```toml
+   APP_USERNAME = "Customer"
+   APP_PASSWORD_HASH = "<hash>"
+   GROQ_API_KEY = "<key>"
    ```
 
-3. Settings (the password hash comes from `python src/security/auth.py`; keep the quotes):
+4. Deploy, open the `*.streamlit.app` link and log in as `Customer`. Every push redeploys.
 
-   ```powershell
-   az webapp config appsettings set -g task4-rg -n <app> --settings SCM_DO_BUILD_DURING_DEPLOYMENT=true APP_USERNAME=Customer "APP_PASSWORD_HASH=<hash>" AZURE_OPENAI_ENDPOINT=<endpoint> AZURE_OPENAI_API_KEY=<key> AZURE_OPENAI_DEPLOYMENT=<deployment>
-   ```
-
-   For reasoning models that reject `temperature`, also set `AZURE_OPENAI_TEMPERATURE=` (empty).
-4. Portal: App Service > Deployment Center > GitHub, pick this repository and branch. Every push redeploys.
-5. Open `https://<app>.azurewebsites.net` and log in as `Customer`.
-
-### Azure Deployment Environments (optional)
-
-`environments/webapp/` is an environment definition (`environment.yaml` + `main.bicep`) that creates the same
-plan and web app. Dev center > Catalogs > Add: this repository, branch `main`, folder path `environments`.
-Then devportal.microsoft.com > New environment > `Task4WebApp` (needs a Microsoft Entra work account with the
-Deployment Environments User role on the project). `repoUrl` works for public repositories only; for a private
-one leave it empty and connect Deployment Center afterwards. Parameter values are visible to project members.
-
-### Abuse protection
-
-- Network floods: Azure DDoS infrastructure protection covers every App Service at no cost (network and
-  transport layers). It does not count HTTP requests per visitor.
-- The app limits each client IP itself (`src/security/limits.py`, defaults in `.env.example`):
-  30 new sessions per 10 min, 5 failed logins per 15 min, 20 questions per hour,
-  plus 500 questions per day for the whole app to cap model cost.
-- Limits are kept in memory, so they hold for one instance (B1). With several instances, move them to Redis.
-- For stronger HTTP-level protection, put Azure Front Door with a WAF rate-limit rule in front (paid).
-- Also set a monthly budget alert on the subscription and a token limit on the model deployment.
+Free tier notes: the app sleeps after a few days without visits (first open wakes it). Groq's free tier limits
+requests and tokens per minute and per day; when hit, the chat shows "The assistant failed: RateLimitError".
+Default model `openai/gpt-oss-120b`; set `GROQ_MODEL` for another one with tool calling, e.g. `openai/gpt-oss-20b`.

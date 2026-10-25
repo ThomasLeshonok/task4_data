@@ -2,7 +2,7 @@ import json
 from typing import Callable
 import streamlit as st
 
-from assistant.agent import Assistant, azure_configured
+from assistant.agent import Assistant, llm_configured
 from security.limits import Limits
 
 from .access import minutes
@@ -40,8 +40,8 @@ def render_chat(get_assistant: Callable[[], Assistant], limits: Limits, ip: str)
     st.title("Ask the data")
     st.caption("Answers come from computed queries over the cleaned data, never from the model's memory. "
                "Open “How I got this” under an answer to see every query and its raw result.")
-    if not azure_configured():
-        st.warning("The assistant is off: set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT.")
+    if not llm_configured():
+        st.warning("The assistant is off: set GROQ_API_KEY (or AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT).")
         return
 
     history = st.session_state.setdefault(HISTORY_KEY, [])
@@ -66,7 +66,7 @@ def render_chat(get_assistant: Callable[[], Assistant], limits: Limits, ip: str)
         try:
             with st.spinner("Querying the data..."):
                 answer = get_assistant().ask(question, context)
-        except Exception as e:  # network, quota or auth errors from the model API
+        except Exception as e:
             st.error(f"The assistant failed: {type(e).__name__}. Try again in a moment.")
             return
         st.markdown(answer.text)

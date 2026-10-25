@@ -1,5 +1,5 @@
-# Asks the real Azure OpenAI deployment the kind of questions graders ask and checks the answers
-# against values computed directly with pandas. Skipped unless AZURE_OPENAI_* is set (e.g. in .env).
+# Asks the real model (Groq or Azure OpenAI) the kind of questions graders ask and checks the answers
+# against values computed directly with pandas. Skipped unless GROQ_API_KEY or AZURE_OPENAI_* is set (e.g. in .env).
 # Run: python -m pytest tests/test_eval_questions.py -v
 import re
 from pathlib import Path
@@ -9,14 +9,14 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
-from assistant.agent import Assistant, AzureChatClient, azure_configured  # noqa: E402
+from assistant.agent import Assistant, llm_configured, make_chat_client  # noqa: E402
 from bookstore.analytics import summarize  # noqa: E402
 from bookstore.repository import list_stores  # noqa: E402
 from bookstore.views import build_view  # noqa: E402
 
 from conftest import get_store  # noqa: E402
 
-pytestmark = pytest.mark.skipif(not azure_configured(), reason="AZURE_OPENAI_* not configured")
+pytestmark = pytest.mark.skipif(not llm_configured(), reason="GROQ_API_KEY or AZURE_OPENAI_* not configured")
 
 def _sales(store):
     return build_view(get_store(store), "sales")
@@ -56,7 +56,7 @@ CASES = [
 
 @pytest.fixture(scope="module")
 def assistant(toolbox):
-    return Assistant(AzureChatClient(), toolbox)
+    return Assistant(make_chat_client(), toolbox)
 
 def _normalize(text: str) -> str:
     text = re.sub(r"(?<=\d)[,  ](?=\d{3}\b)", "", text)
