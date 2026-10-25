@@ -5,10 +5,10 @@ import streamlit as st
 TREND_DAYS = 14  
 
 STYLE = """
-<style>
-div:has(> .st-key-top-days) { flex: 1 1 320px; }
-div:has(> .st-key-revenue-trend) { flex: 2.6 1 560px; }
-</style>
+    <style>
+        div:has(> .st-key-top-days) { flex: 1 1 320px; }
+        div:has(> .st-key-revenue-trend) { flex: 2.6 1 560px; }
+    </style>
 """
 
 def apply_styles() -> None:
