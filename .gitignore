@@ -7,5 +7,7 @@ task4
 /src/data_loader12.py
 /src/.claude
 __pycache__/
+.env
+.pytest_cache/
 /claude2.py.lprof
 /data/*/clean/*.html

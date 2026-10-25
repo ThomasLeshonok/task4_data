@@ -1,10 +1,10 @@
-"""Page sections for one store."""
 import streamlit as st
 
 from bookstore import analytics
 from bookstore.analytics import StoreSummary
 from bookstore.entities import USER_FIELDS
 from bookstore.repository import Store
+from bookstore.views import build_view
 
 from .components import card, money, revenue_chart, top_days_table
 
@@ -42,16 +42,27 @@ def revenue(store: Store, summary: StoreSummary) -> None:
             st.markdown("**Daily revenue**")
             revenue_chart(analytics.daily_revenue(store), [d["date"] for d in summary.top_days])
 
-def data_explorer(store: Store) -> None:
+def data_explorer(store: Store, filtered: Store) -> None:
+    sales = build_view(store, "sales")
+    sales = sales[sales["order_id"].isin(filtered.orders["id"])]
+    books = build_view(store, "books")
+    users = build_view(store, "users")
+    if filtered is not store:
+        books = books[books["id"].isin(sales["book_id"])]
+        users = users[users["id"].isin(sales["user_id"])]
     with st.expander("Explore data"):
-        books, users, orders = st.tabs(["Books", "Users", "Orders"])
-        books.dataframe(store.books, hide_index=True, width="stretch")
-        users.dataframe(store.users.assign(person=store.users["id"].map(store.people)),
-                        hide_index=True, width="stretch")
-        orders.dataframe(store.orders, hide_index=True, width="stretch")
+        tabs = st.tabs([f"Sales ({len(sales):,})", f"Books ({len(books):,})", f"Users ({len(users):,})"])
+        for tab, frame in zip(tabs, (sales, books, users)):
+            tab.dataframe(frame.drop(columns="store"), hide_index=True, width="stretch")
 
-def render_store(store: Store, summary: StoreSummary) -> None:
+def render_store(store: Store, filtered: Store, summary: StoreSummary | None) -> None:
+    if filtered is not store:
+        st.caption(f"Filtered: {len(filtered.orders):,} of {len(store.orders):,} orders. "
+                   "Users and author sets count only the customers and books in these orders.")
+    if summary is None:
+        st.info("No orders match the current filters.")
+        return
     kpis(summary)
     highlights(summary)
-    revenue(store, summary)
-    data_explorer(store)
+    revenue(filtered, summary)
+    data_explorer(store, filtered)

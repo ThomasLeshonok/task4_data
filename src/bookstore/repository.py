@@ -24,6 +24,15 @@ class Store:
     def authors(self) -> pd.Series:
         return author_sets(self.books)
 
+    def subset(self, order_ids) -> "Store":
+        orders = self.orders[self.orders["id"].isin(order_ids)]
+        books = self.books[self.books["id"].isin(orders["book_id"])]
+        users = self.users[self.users["id"].isin(orders["user_id"])]
+        sub = Store(self.name, books, users, orders)
+        sub.__dict__["people"] = self.people[self.people.index.isin(users["id"])]
+        sub.__dict__["authors"] = self.authors.loc[books.index]
+        return sub
+
 def clean_dir(store: str, data_dir: Path = DATA_DIR) -> Path:
     return data_dir / store / "clean"
 
