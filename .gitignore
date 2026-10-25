@@ -11,3 +11,6 @@ __pycache__/
 .pytest_cache/
 /claude2.py.lprof
 /data/*/clean/*.html
+/params.json
+/loggggs.py
+/loggggs.json
