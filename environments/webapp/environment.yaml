@@ -11,11 +11,17 @@ parameters:
     description: Globally unique web app name (<app>.azurewebsites.net). Leave empty for a generated name.
     type: string
     default: ""
+  - id: location
+    name: Region
+    description: Azure region, for example westeurope or northeurope. Leave empty for the resource group's region.
+    type: string
+    default: ""
   - id: sku
     name: Plan SKU
+    description: F1 is free (no Always On, 60 CPU minutes a day) and works when the subscription has no B1 quota.
     type: string
     default: B1
-    allowed: [B1, B2, S1, P0v3]
+    allowed: [F1, B1, B2, S1, P0v3]
   - id: pythonVersion
     name: Python version
     type: string

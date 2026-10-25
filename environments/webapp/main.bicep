@@ -1,9 +1,9 @@
 // Azure Deployment Environments definition: App Service plan + Streamlit web app.
 
 param appName string = ''
-param location string = resourceGroup().location
+param location string = ''
 
-@allowed(['B1', 'B2', 'S1', 'P0v3'])
+@allowed(['F1', 'B1', 'B2', 'S1', 'P0v3'])
 param sku string = 'B1'
 param pythonVersion string = '3.13'
 param repoUrl string = ''
@@ -19,10 +19,11 @@ param openAiDeployment string = ''
 param openAiApiKey string = ''
 
 var name = empty(appName) ? 'task4-${uniqueString(resourceGroup().id)}' : appName
+var region = empty(location) ? resourceGroup().location : location
 
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: '${name}-plan'
-  location: location
+  location: region
   kind: 'linux'
   sku: {
     name: sku
@@ -34,7 +35,7 @@ resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
 
 resource site 'Microsoft.Web/sites@2024-04-01' = {
   name: name
-  location: location
+  location: region
   kind: 'app,linux'
   properties: {
     serverFarmId: plan.id
@@ -43,7 +44,7 @@ resource site 'Microsoft.Web/sites@2024-04-01' = {
       linuxFxVersion: 'PYTHON|${pythonVersion}'
       appCommandLine: 'python -m streamlit run streamlit_app.py --server.port 8000 --server.address 0.0.0.0'
       webSocketsEnabled: true
-      alwaysOn: true
+      alwaysOn: sku != 'F1'
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       appSettings: [
